@@ -4,6 +4,7 @@ import datetime
 import time
 import logging
 import re
+from database import adapt_query_placeholders
 
 # Não precisamos importar execute_query diretamente, pois usaremos self.db.
 # from database import execute_query
@@ -48,7 +49,7 @@ class LockdownCore(commands.Cog):
         """Verifica se um canal está em lockdown no DB."""
         try:
             result = await self.db.fetch_one(  # Usando self.db.fetch_one
-                "SELECT channel_id FROM locked_channels WHERE channel_id = ?",
+                adapt_query_placeholders("SELECT channel_id FROM locked_channels WHERE channel_id = ?"),
                 (channel_id,)
             )
             return result is not None
@@ -79,11 +80,11 @@ class LockdownCore(commands.Cog):
 
             db_success = False
             try:
-                db_success = await self.db.execute_query(db_query, (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None))  # Usando self.db
-            except Exception as e:
-                logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
+            db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None))  # Usando self.db
+        except Exception as e:
+            logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
-            if not db_success:
+        if not db_success:
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")
                 return False, "Erro no banco de dados ao registrar lockdown."
 
@@ -96,11 +97,11 @@ class LockdownCore(commands.Cog):
             db_query = "DELETE FROM locked_channels WHERE channel_id = ?"
             db_success = False
             try:
-                db_success = await self.db.execute_query(db_query, (channel.id,))  # Usando self.db
-            except Exception as e:
-                logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
+            db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id,))  # Usando self.db
+        except Exception as e:
+            logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
-            if not db_success:
+        if not db_success:
                 logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}).")
                 return False, "Erro no banco de dados ao remover lockdown."
 
@@ -154,7 +155,7 @@ class LockdownCore(commands.Cog):
         expired_lockdowns = []
         try:
             expired_lockdowns = await self.db.fetch_all(
-                "SELECT channel_id, guild_id, reason FROM locked_channels WHERE locked_until_timestamp IS NOT NULL AND locked_until_timestamp <= $1",
+                adapt_query_placeholders("SELECT channel_id, guild_id, reason FROM locked_channels WHERE locked_until_timestamp IS NOT NULL AND locked_until_timestamp <= $1"),
                 (current_time,)
             )
         except Exception as e:
@@ -169,7 +170,7 @@ class LockdownCore(commands.Cog):
                 if not guild:
                     logging.warning(f"Guild {guild_id} não encontrada para lockdown expirado do canal {channel_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM locked_channels WHERE channel_id = ?"), (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após guild não encontrada: {e}", exc_info=True)
                     continue
@@ -178,7 +179,7 @@ class LockdownCore(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     logging.warning(f"Canal {channel_id} não encontrado ou não é de texto para lockdown expirado na guild {guild_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM locked_channels WHERE channel_id = ?"), (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após canal não encontrado: {e}", exc_info=True)
                     continue
@@ -196,7 +197,7 @@ class LockdownCore(commands.Cog):
         all_locked_channels = []
         try:
             all_locked_channels = await self.db.fetch_all(  # Usando self.db.fetch_all
-                "SELECT channel_id, guild_id, reason, locked_by_id, locked_until_timestamp FROM locked_channels"
+                adapt_query_placeholders("SELECT channel_id, guild_id, reason, locked_by_id, locked_until_timestamp FROM locked_channels")
             )
         except Exception as e:
             logging.error(f"Erro ao buscar lockdowns persistentes do DB no carregamento: {e}", exc_info=True)
@@ -209,7 +210,7 @@ class LockdownCore(commands.Cog):
                 if not guild:
                     logging.warning(f"Guild {guild_id} não encontrada para canal {channel_id} no carregamento. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM locked_channels WHERE channel_id = ?"), (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após guild não encontrada no carregamento: {e}", exc_info=True)
                     continue
@@ -218,7 +219,7 @@ class LockdownCore(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     logging.warning(f"Canal {channel_id} não encontrado ou não é de texto no carregamento para guild {guild_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM locked_channels WHERE channel_id = ?"), (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após canal não encontrado no carregamento: {e}", exc_info=True)
                     continue

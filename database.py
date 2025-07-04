@@ -64,7 +64,7 @@ class DatabaseManager:
         """
         async with self.pool.acquire() as conn:
             try:
-                # Use the adapter for placeholders
+                # Adapt the query placeholders
                 adapted_query = adapt_query_placeholders(query)
                 await conn.execute(adapted_query, *params)  # asyncpg takes params unpacked
                 return True

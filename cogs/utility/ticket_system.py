@@ -6,6 +6,7 @@ import os
 import datetime
 import asyncio
 import json
+from database import adapt_query_placeholders
 
 # Supondo que execute_query, fetch_one, fetch_all (e init_db para main.py)
 # estão no seu database.py e são métodos assíncronos do DatabaseManager.
@@ -675,14 +676,13 @@ class TicketPanelView(ui.View):
     @ui.button(label="Abrir Ticket", style=discord.ButtonStyle.primary, custom_id="open_ticket_button")
     async def open_ticket(self, interaction: discord.Interaction, button: ui.Button):
         try:
-            await asyncio.sleep(0.1)
             await interaction.response.defer(ephemeral=True)
         except discord.NotFound:
             logging.error(f"Unknown interaction ao deferir open_ticket para o usuário {interaction.user.id} na guild {interaction.guild_id}.")
             return
 
         existing_ticket = await self.bot.db_connection.fetch_one(
-            "SELECT channel_id FROM active_tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'",
+            adapt_query_placeholders("SELECT channel_id FROM active_tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'"),
             (interaction.guild_id, interaction.user.id)
         )
         if existing_ticket:
@@ -691,11 +691,11 @@ class TicketPanelView(ui.View):
                 await interaction.followup.send(f"Você já tem um ticket aberto em {channel.mention}.", ephemeral=True)
                 return
             else:
-                await self.bot.db_connection.execute_query("DELETE FROM active_tickets WHERE channel_id = ?", (existing_ticket['channel_id'],))
+                await self.bot.db_connection.execute_query(adapt_query_placeholders("DELETE FROM active_tickets WHERE channel_id = ?"), (existing_ticket['channel_id'],))
                 logging.warning(f"Registro de ticket obsoleto para o usuário {interaction.user.id} na guild {interaction.guild_id} removido.")
 
         settings = await self.bot.db_connection.fetch_one(
-            "SELECT category_id, support_role_id, ticket_initial_embed_json FROM ticket_settings WHERE guild_id = ?",
+            adapt_query_placeholders("SELECT category_id, support_role_id, ticket_initial_embed_json FROM ticket_settings WHERE guild_id = ?"),
             (interaction.guild_id,)
         )
 
@@ -729,12 +729,12 @@ class TicketPanelView(ui.View):
             ticket_channel = await category.create_text_channel(f"ticket-{interaction.user.name}", overwrites=overwrites)
             
             await self.bot.db_connection.execute_query(
-                "INSERT INTO active_tickets (guild_id, user_id, channel_id, created_at, status) VALUES (?, ?, ?, ?, ?)",
-                (interaction.guild_id, interaction.user.id, ticket_channel.id, datetime.datetime.now().isoformat(), 'open')
+            adapt_query_placeholders("INSERT INTO active_tickets (guild_id, user_id, channel_id, created_at, status) VALUES (?, ?, ?, ?, ?)"),
+            (interaction.guild_id, interaction.user.id, ticket_channel.id, datetime.datetime.now().isoformat(), 'open')
             )
             ticket_info = await self.bot.db_connection.fetch_one(
-                "SELECT ticket_id FROM active_tickets WHERE channel_id = ?",
-                (ticket_channel.id,)
+            adapt_query_placeholders("SELECT ticket_id FROM active_tickets WHERE channel_id = ?"),
+            (ticket_channel.id,)
             )
             ticket_id = ticket_info['ticket_id'] if ticket_info else "N/A"
 
@@ -773,7 +773,6 @@ class CloseTicketView(ui.View):
     @ui.button(label="Fechar Ticket", style=discord.ButtonStyle.danger, custom_id="close_ticket_button")
     async def close_ticket(self, interaction: discord.Interaction, button: ui.Button):
         try:
-            await asyncio.sleep(0.1)
             await interaction.response.send_message("Tem certeza que deseja fechar este ticket? Isso o deletará permanentemente.", view=CloseTicketConfirmView(), ephemeral=True)
         except discord.NotFound:
             logging.error(f"Unknown interaction ao enviar confirmação de fechar ticket para o canal {interaction.channel_id}.")
@@ -792,7 +791,7 @@ class CloseTicketConfirmView(ui.View):
         guild_id = interaction.guild_id
 
         ticket_info = await interaction.client.db_connection.fetch_one(
-            "SELECT ticket_id, user_id, channel_id FROM active_tickets WHERE channel_id = ? AND status = 'open'",
+            adapt_query_placeholders("SELECT ticket_id, user_id, channel_id FROM active_tickets WHERE channel_id = ? AND status = 'open'"),
             (ticket_channel.id,)
         )
 
@@ -805,7 +804,7 @@ class CloseTicketConfirmView(ui.View):
         channel_id = ticket_info['channel_id']
 
         settings = await interaction.client.db_connection.fetch_one(
-            "SELECT transcript_channel_id FROM ticket_settings WHERE guild_id = ?",
+            adapt_query_placeholders("SELECT transcript_channel_id FROM ticket_settings WHERE guild_id = ?"),
             (guild_id,)
         )
         transcript_channel_id = settings['transcript_channel_id'] if settings else None
@@ -824,7 +823,7 @@ class CloseTicketConfirmView(ui.View):
             logging.info(f"Canal do ticket {channel_id} deletado com sucesso.")
             
             await interaction.client.db_connection.execute_query(
-                "UPDATE active_tickets SET status = 'closed', closed_by_id = ?, closed_at = ? WHERE ticket_id = ?",
+                adapt_query_placeholders("UPDATE active_tickets SET status = 'closed', closed_by_id = ?, closed_at = ? WHERE ticket_id = ?"),
                 (interaction.user.id, datetime.datetime.now().isoformat(), ticket_id)
             )
             logging.info(f"Ticket {ticket_id} (Channel ID: {channel_id}) fechado e status atualizado no DB.")
@@ -865,7 +864,7 @@ class TicketSystem(commands.Cog):
         logging.info("Views persistentes de ticket garantidas.")
         for guild in self.bot.guilds:
             settings = await self.bot.db_connection.fetch_one(
-                "SELECT panel_channel_id, panel_message_id FROM ticket_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT panel_channel_id, panel_message_id FROM ticket_settings WHERE guild_id = ?"),
                 (guild.id,)
             )
             if settings and settings['panel_channel_id'] and settings['panel_message_id']:
@@ -943,10 +942,12 @@ class TicketSystem(commands.Cog):
     @app_commands.describe(channel="O canal onde o painel de tickets será enviado.")
     @app_commands.default_permissions(administrator=True)
     async def set_ticket_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
+        logging.info(f"Deferring response for set_ticket_channel in guild {interaction.guild_id}")
         await interaction.response.defer(ephemeral=True)
+        logging.info(f"Deferred response for set_ticket_channel in guild {interaction.guild_id}")
 
         panel_settings = await self.bot.db_connection.fetch_one(
-            "SELECT panel_embed_json FROM ticket_settings WHERE guild_id = ?",
+            adapt_query_placeholders("SELECT panel_embed_json FROM ticket_settings WHERE guild_id = ?"),
             (interaction.guild_id,)
         )
         panel_embed_json_raw = panel_settings['panel_embed_json'] if panel_settings else None
@@ -973,11 +974,11 @@ class TicketSystem(commands.Cog):
             message = await channel.send(embed=panel_embed, view=TicketPanelView(bot=self.bot))
 
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO ticket_settings (guild_id) VALUES (?)",
+                adapt_query_placeholders("INSERT OR IGNORE INTO ticket_settings (guild_id) VALUES (?)"),
                 (interaction.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE ticket_settings SET panel_channel_id = ?, panel_message_id = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE ticket_settings SET panel_channel_id = ?, panel_message_id = ? WHERE guild_id = ?"),
                 (channel.id, message.id, interaction.guild_id)
             )
             await interaction.followup.send(f"Painel de tickets enviado e configurado para {channel.mention}!", ephemeral=True)
@@ -992,13 +993,15 @@ class TicketSystem(commands.Cog):
     @app_commands.describe(category="A categoria para os canais de ticket.")
     @app_commands.default_permissions(administrator=True)
     async def set_ticket_category(self, interaction: discord.Interaction, category: discord.CategoryChannel):
+        logging.info(f"Deferring response for set_ticket_category in guild {interaction.guild_id}")
         await interaction.response.defer(ephemeral=True)
+        logging.info(f"Deferred response for set_ticket_category in guild {interaction.guild_id}")
         await self.bot.db_connection.execute_query(
             "INSERT OR IGNORE INTO ticket_settings (guild_id) VALUES (?)",
             (interaction.guild_id,)
         )
         await self.bot.db_connection.execute_query(
-            "UPDATE ticket_settings SET category_id = ? WHERE guild_id = ?",
+            adapt_query_placeholders("UPDATE ticket_settings SET category_id = ? WHERE guild_id = ?"),
             (category.id, interaction.guild_id)
         )
         await interaction.followup.send(f"Categoria de tickets definida para **{category.name}**.", ephemeral=True)
@@ -1013,7 +1016,7 @@ class TicketSystem(commands.Cog):
             (interaction.guild_id,)
         )
         await self.bot.db_connection.execute_query(
-            "UPDATE ticket_settings SET support_role_id = ? WHERE guild_id = ?",
+            adapt_query_placeholders("UPDATE ticket_settings SET support_role_id = ? WHERE guild_id = ?"),
             (role.id, interaction.guild_id)
         )
         await interaction.followup.send(f"Cargo de suporte para tickets definido para **{role.name}**.", ephemeral=True)
@@ -1028,7 +1031,7 @@ class TicketSystem(commands.Cog):
             (interaction.guild_id,)
         )
         await self.bot.db_connection.execute_query(
-            "UPDATE ticket_settings SET transcript_channel_id = ? WHERE guild_id = ?",
+            adapt_query_placeholders("UPDATE ticket_settings SET transcript_channel_id = ? WHERE guild_id = ?"),
             (channel.id, interaction.guild_id)
         )
         await interaction.followup.send(f"Canal de transcrições de tickets definido para **{channel.mention}**.", ephemeral=True)
@@ -1040,7 +1043,7 @@ class TicketSystem(commands.Cog):
 
         guild_id = interaction.guild_id
         tickets = await self.bot.db_connection.fetch_all(
-            "SELECT ticket_id, user_id, channel_id, created_at, status, closed_by_id, closed_at FROM active_tickets WHERE guild_id = ?",
+            adapt_query_placeholders("SELECT ticket_id, user_id, channel_id, created_at, status, closed_by_id, closed_at FROM active_tickets WHERE guild_id = ?"),
             (guild_id,)
         )
 

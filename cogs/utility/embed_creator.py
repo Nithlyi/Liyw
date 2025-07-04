@@ -6,6 +6,7 @@ import os
 import datetime
 import logging
 import asyncio # Para usar bot.wait_for
+from database import adapt_query_placeholders
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -507,7 +508,7 @@ class EmbedCreatorMainView(ui.View):
                 success = False
                 try:
                     success = await self.db.execute_query( # Usando self.db
-                        "INSERT OR REPLACE INTO saved_embeds (guild_id, embed_name, embed_json) VALUES (?, ?, ?)",
+                        adapt_query_placeholders("INSERT OR REPLACE INTO saved_embeds (guild_id, embed_name, embed_json) VALUES (?, ?, ?)"),
                         (guild_id, name, embed_json)
                     )
                 except Exception as e:
@@ -585,9 +586,8 @@ class EmbedCreatorCog(commands.Cog):
         result = None
         try:
             result = await self.db.fetch_one( # Usando self.db
-                "SELECT embed_json FROM saved_embeds WHERE guild_id = ? AND embed_name = ?",
+                adapt_query_placeholders("SELECT embed_json FROM saved_embeds WHERE guild_id = ? AND embed_name = ?"),
                 (guild_id, name)
-            )
         except Exception as e:
             logging.error(f"Erro ao carregar embed do DB para guild {guild_id}, nome {name}: {e}", exc_info=True)
             await interaction.response.send_message("Ocorreu um erro ao carregar o embed.", ephemeral=True)
@@ -609,7 +609,7 @@ class EmbedCreatorCog(commands.Cog):
         results = []
         try:
             results = await self.db.fetch_all( # Usando self.db
-                "SELECT embed_name FROM saved_embeds WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT embed_name FROM saved_embeds WHERE guild_id = ?"),
                 (guild_id,)
             )
         except Exception as e:
@@ -637,7 +637,7 @@ class EmbedCreatorCog(commands.Cog):
 
         # Verifica se o embed existe antes de tentar deletar
         exists = await self.db.fetch_one(
-            "SELECT 1 FROM saved_embeds WHERE guild_id = ? AND embed_name = ?",
+            adapt_query_placeholders("SELECT 1 FROM saved_embeds WHERE guild_id = ? AND embed_name = ?"),
             (guild_id, name)
         )
 
@@ -647,7 +647,7 @@ class EmbedCreatorCog(commands.Cog):
 
         try:
             success = await self.db.execute_query(
-                "DELETE FROM saved_embeds WHERE guild_id = ? AND embed_name = ?",
+                adapt_query_placeholders("DELETE FROM saved_embeds WHERE guild_id = ? AND embed_name = ?"),
                 (guild_id, name)
             )
             if success:

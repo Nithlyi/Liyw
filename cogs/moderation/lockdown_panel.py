@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands, ui
 import logging
+from database import adapt_query_placeholders
 
 # Importa o cog principal de lockdown. É importante que LockdownCore seja carregado antes de LockdownPanel.
 from cogs.moderation.lockdown_core import LockdownCore 
@@ -31,7 +32,7 @@ class LockdownPanelView(ui.View):
         panel_data = None
         try:
             panel_data = await self.db.fetch_one( # Usando self.db
-                "SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?"),
                 (guild_id,)
             )
         except Exception as e:
@@ -41,7 +42,7 @@ class LockdownPanelView(ui.View):
         if not panel_data or panel_data[0] is None or panel_data[1] is None:
             logging.warning(f"[refresh_panel_lockdown] Nenhum dado de canal/mensagem válido encontrado no DB para o painel de lockdown da guild {guild_id}. Não foi possível atualizar o painel.")
             try:
-                await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
             except Exception as e:
                 logging.error(f"Erro ao deletar entrada inválida do painel de lockdown no DB para guild {guild_id}: {e}", exc_info=True)
             return
@@ -279,7 +280,7 @@ class LockdownPanelView(ui.View):
         locked_channels_data = []
         try:
             locked_channels_data = await self.db.fetch_all( # Usando self.db
-                "SELECT channel_id FROM locked_channels WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT channel_id FROM locked_channels WHERE guild_id = ?"),
                 (interaction.guild.id,)
             )
         except Exception as e:
@@ -294,7 +295,7 @@ class LockdownPanelView(ui.View):
             if not channel or not isinstance(channel, discord.TextChannel):
                 logging.warning(f"Canal {channel_id} do DB não encontrado ou não é de texto. Removendo do DB.")
                 try:
-                    await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,)) # Usando self.db
+                    await self.db.execute_query(adapt_query_placeholders("DELETE FROM locked_channels WHERE channel_id = ?"), (channel_id,)) # Usando self.db
                 except Exception as e:
                     logging.error(f"Erro ao remover canal {channel_id} do DB após não encontrado: {e}", exc_info=True)
                 continue
@@ -334,7 +335,7 @@ class LockdownPanel(commands.Cog):
         
         panel_datas = []
         try:
-            panel_datas = await self.db.fetch_all("SELECT guild_id, channel_id, message_id FROM lockdown_panel_settings") # Usando self.db
+        panel_datas = await self.db.fetch_all(adapt_query_placeholders("SELECT guild_id, channel_id, message_id FROM lockdown_panel_settings")) # Usando self.db
         except Exception as e:
             logging.error(f"Erro ao buscar painéis persistentes de lockdown do DB: {e}", exc_info=True)
             return # Aborta se houver erro no DB
@@ -346,7 +347,7 @@ class LockdownPanel(commands.Cog):
                 if channel_id is None or message_id is None:
                     logging.warning(f"[ensure_persistent_panel_view] Pulando entrada inválida no DB para guild {guild_id} (channel_id ou message_id é None). Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao deletar entrada inválida do painel de lockdown no DB: {e}", exc_info=True)
                     continue
@@ -356,7 +357,7 @@ class LockdownPanel(commands.Cog):
                     if not guild:
                         logging.warning(f"Guild {guild_id} não encontrada para painel persistente de lockdown. Removendo do DB.")
                         try:
-                            await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                            await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                         except Exception as e:
                             logging.error(f"Erro ao deletar painel de lockdown do DB após guild não encontrada: {e}", exc_info=True)
                         continue
@@ -365,7 +366,7 @@ class LockdownPanel(commands.Cog):
                     if not isinstance(channel, discord.TextChannel):
                         logging.warning(f"Canal {channel_id} não é de texto para painel persistente de lockdown na guild {guild_id}. Removendo do DB.")
                         try:
-                            await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                            await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                         except Exception as e:
                             logging.error(f"Erro ao deletar painel de lockdown do DB após canal não ser de texto: {e}", exc_info=True)
                         continue
@@ -378,7 +379,7 @@ class LockdownPanel(commands.Cog):
                 except discord.NotFound:
                     logging.warning(f"Mensagem do painel de Lockdown ({message_id}) ou canal ({channel_id}) não encontrada. Removendo do DB para evitar carregamentos futuros.")
                     try:
-                        await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE message_id = ?", (message_id,)) # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE message_id = ?"), (message_id,)) # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao deletar painel de lockdown do DB após mensagem/canal não encontrado: {e}", exc_info=True)
                 except discord.Forbidden:
@@ -397,7 +398,7 @@ class LockdownPanel(commands.Cog):
         old_panel_data = None
         try:
             old_panel_data = await self.db.fetch_one( # Usando self.db
-                "SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?"),
                 (guild_id,)
             )
         except Exception as e:
@@ -429,7 +430,7 @@ class LockdownPanel(commands.Cog):
         elif old_panel_data: 
             logging.warning(f"[setup_lockdown_panel] Entrada antiga de painel com IDs None para guild {guild_id}. Apenas deletando do DB.")
             try:
-                await self.db.execute_query("DELETE FROM lockdown_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                await self.db.execute_query(adapt_query_placeholders("DELETE FROM lockdown_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
             except Exception as e:
                 logging.error(f"Erro ao deletar entrada inválida do painel de lockdown do DB: {e}", exc_info=True)
 
@@ -462,9 +463,8 @@ class LockdownPanel(commands.Cog):
             logging.info(f"[setup_lockdown_panel] Tentando salvar no DB: guild_id={guild_id}, channel_id={interaction.channel.id}, message_id={panel_message.id}")
 
             success_db_insert = await self.db.execute_query( # Usando self.db
-                "INSERT OR REPLACE INTO lockdown_panel_settings (guild_id, channel_id, message_id) VALUES (?, ?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO lockdown_panel_settings (guild_id, channel_id, message_id) VALUES (?, ?, ?)"),
                 (guild_id, interaction.channel.id, panel_message.id)
-            )
             if success_db_insert:
                 logging.info(f"[setup_lockdown_panel] Dados do painel de lockdown salvos com sucesso no DB para guild {guild_id}.")
             else:
@@ -489,7 +489,7 @@ class LockdownPanel(commands.Cog):
         panel_data = None
         try:
             panel_data = await self.db.fetch_one( # Usando self.db
-                "SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT channel_id, message_id FROM lockdown_panel_settings WHERE guild_id = ?"),
                 (guild_id,)
             )
         except Exception as e:

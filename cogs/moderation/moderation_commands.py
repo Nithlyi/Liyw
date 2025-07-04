@@ -6,6 +6,7 @@ import datetime
 import logging
 import re # Para parsing do tempo
 from typing import Optional # Importa Optional para tipagem
+from database import adapt_query_placeholders
 
 # Configuração de logging
 logger = logging.getLogger(__name__)
@@ -69,7 +70,7 @@ class WarnModal(ui.Modal, title="Advertir Usuário"):
         try:
             # Assumindo que self.db.execute_query retorna True para sucesso
             success = await self.db.execute_query( # Usando self.db
-                "INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)",
+                adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)"),
                 (interaction.guild_id, "warn", self.target_member.id, interaction.user.id, reason_text)
             )
         except Exception as e:
@@ -179,9 +180,8 @@ class KickModal(ui.Modal, title="Expulsar Usuário"):
             success = False
             try:
                 success = await self.db.execute_query( # Usando self.db
-                    "INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)",
+                    adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)"),
                     (interaction.guild.id, "kick", self.target_member.id, interaction.user.id, reason_text)
-                )
             except Exception as e:
                 logger.error(f"Erro ao registrar expulsão no DB para {self.target_member.id}: {e}", exc_info=True)
                 # Não precisa retornar aqui, pois a expulsão já foi feita. Apenas logar.
@@ -292,9 +292,8 @@ class BanModal(ui.Modal, title="Banir Usuário"):
             success = False
             try:
                 success = await self.db.execute_query( # Usando self.db
-                    "INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)",
+                    adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)"),
                     (interaction.guild.id, "ban", self.target_member.id, interaction.user.id, reason_text)
-                )
             except Exception as e:
                 logger.error(f"Erro ao registrar banimento no DB para {self.target_member.id}: {e}", exc_info=True)
                 # Não precisa retornar aqui, pois o banimento já foi feito. Apenas logar.
@@ -400,9 +399,8 @@ class MuteModal(ui.Modal, title="Silenciar Usuário"):
             success = False
             try:
                 success = await self.db.execute_query( # Usando self.db
-                    "INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason, duration) VALUES (?, ?, ?, ?, ?, ?)",
+                    adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason, duration) VALUES (?, ?, ?, ?, ?, ?)"),
                     (interaction.guild.id, "mute", self.target_member.id, interaction.user.id, reason_text, duration_str)
-                )
             except Exception as e:
                 logger.error(f"Erro ao registrar silenciamento no DB para {self.target_member.id}: {e}", exc_info=True)
                 # Não precisa retornar aqui, pois o silenciamento já foi feito. Apenas logar.
@@ -706,7 +704,7 @@ class ModerationCommands(commands.Cog):
             success = False
             try:
                 success = await self.db.execute_query(
-                    "INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)",
+                    adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)"),
                     (interaction.guild.id, "unban", user.id, interaction.user.id, "Unban manual")
                 )
             except Exception as e:

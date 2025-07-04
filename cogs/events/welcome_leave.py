@@ -3,6 +3,7 @@ from discord.ext import commands
 from discord import app_commands, ui
 import logging
 import json
+from database import adapt_query_placeholders
 
 # Não precisamos importar execute_query diretamente, pois usaremos self.db
 # from database import execute_query
@@ -108,7 +109,7 @@ class WelcomeConfigView(ui.View):
         settings = None
         try:
             settings = await self.db.fetch_one( # Usando self.db
-                "SELECT welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_json FROM welcome_leave_messages WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_json FROM welcome_leave_messages WHERE guild_id = ?"),
                 (self.guild_id,)
             )
         except Exception as e:
@@ -167,7 +168,7 @@ class WelcomeConfigView(ui.View):
 
     # Helpers para carregar/salvar embed JSON
     async def _get_welcome_embed_data(self): # Tornar assíncrono
-        settings = await self.db.fetch_one("SELECT welcome_embed_json FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        settings = await self.db.fetch_one(adapt_query_placeholders("SELECT welcome_embed_json FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         if settings and settings[0]:
             try:
                 return json.loads(settings[0])
@@ -180,7 +181,7 @@ class WelcomeConfigView(ui.View):
         embed_json = json.dumps(embed_data)
         try:
             await self.db.execute_query( # Usando self.db
-                "INSERT OR REPLACE INTO welcome_leave_messages (guild_id, welcome_embed_json) VALUES (?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO welcome_leave_messages (guild_id, welcome_embed_json) VALUES (?, ?)"),
                 (self.guild_id, embed_json)
             )
         except Exception as e:
@@ -190,12 +191,12 @@ class WelcomeConfigView(ui.View):
     @ui.button(label="Alternar Status", style=discord.ButtonStyle.primary, row=0)
     async def toggle_welcome_status(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
-        current_status = await self.db.fetch_one("SELECT welcome_enabled FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_status = await self.db.fetch_one(adapt_query_placeholders("SELECT welcome_enabled FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         new_status = not current_status[0] if current_status and current_status[0] is not None else True # Handle None or 0
         
         try:
             await self.db.execute_query( # Usando self.db
-                "INSERT OR REPLACE INTO welcome_leave_messages (guild_id, welcome_enabled) VALUES (?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO welcome_leave_messages (guild_id, welcome_enabled) VALUES (?, ?)"),
                 (self.guild_id, new_status)
             )
             await self._update_welcome_display(interaction)
@@ -238,7 +239,7 @@ class WelcomeConfigView(ui.View):
                 except ValueError:
                     await interaction.followup.send("ID de canal inválido. Por favor, insira um número.", ephemeral=True)
         
-        current_settings = await self.db.fetch_one("SELECT welcome_channel_id FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_settings = await self.db.fetch_one(adapt_query_placeholders("SELECT welcome_channel_id FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         current_channel_id = current_settings[0] if current_settings else None
         await interaction.response.send_modal(WelcomeChannelModal(parent_view=self, current_channel_id=current_channel_id)) # db_manager removido
 
@@ -267,7 +268,7 @@ class WelcomeConfigView(ui.View):
                     logging.error(f"Erro ao definir mensagem de boas-vindas no DB para guild {original_view.guild_id}: {e}", exc_info=True)
                     await interaction.followup.send("Ocorreu um erro ao salvar a mensagem no banco de dados.", ephemeral=True)
         
-        current_settings = await self.db.fetch_one("SELECT welcome_message FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_settings = await self.db.fetch_one(adapt_query_placeholders("SELECT welcome_message FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         current_message = current_settings[0] if current_settings and current_settings[0] else ""
         await interaction.response.send_modal(WelcomeMessageModal(parent_view=self, current_message=current_message)) # db_manager removido
 
@@ -448,7 +449,7 @@ class LeaveConfigView(ui.View):
         settings = None
         try:
             settings = await self.db.fetch_one( # Usando self.db
-                "SELECT leave_enabled, leave_channel_id, leave_message, leave_embed_json FROM welcome_leave_messages WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT leave_enabled, leave_channel_id, leave_message, leave_embed_json FROM welcome_leave_messages WHERE guild_id = ?"),
                 (self.guild_id,)
             )
         except Exception as e:
@@ -507,7 +508,7 @@ class LeaveConfigView(ui.View):
 
     # Helpers para carregar/salvar embed JSON de saída
     async def _get_leave_embed_data(self): # Tornar assíncrono
-        settings = await self.db.fetch_one("SELECT leave_embed_json FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        settings = await self.db.fetch_one(adapt_query_placeholders("SELECT leave_embed_json FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         if settings and settings[0]:
             try:
                 return json.loads(settings[0])
@@ -520,7 +521,7 @@ class LeaveConfigView(ui.View):
         embed_json = json.dumps(embed_data)
         try:
             await self.db.execute_query( # Usando self.db
-                "INSERT OR REPLACE INTO welcome_leave_messages (guild_id, leave_embed_json) VALUES (?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO welcome_leave_messages (guild_id, leave_embed_json) VALUES (?, ?)"),
                 (self.guild_id, embed_json)
             )
         except Exception as e:
@@ -529,12 +530,12 @@ class LeaveConfigView(ui.View):
     @ui.button(label="Alternar Status", style=discord.ButtonStyle.primary, row=0)
     async def toggle_leave_status(self, interaction: discord.Interaction, button: ui.Button):
         await interaction.response.defer()
-        current_status = await self.db.fetch_one("SELECT leave_enabled FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_status = await self.db.fetch_one(adapt_query_placeholders("SELECT leave_enabled FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         new_status = not current_status[0] if current_status and current_status[0] is not None else True # Handle None or 0
         
         try:
             await self.db.execute_query( # Usando self.db
-                "INSERT OR REPLACE INTO welcome_leave_messages (guild_id, leave_enabled) VALUES (?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO welcome_leave_messages (guild_id, leave_enabled) VALUES (?, ?)"),
                 (self.guild_id, new_status)
             )
             await self._update_leave_display(interaction)
@@ -576,7 +577,7 @@ class LeaveConfigView(ui.View):
                 except ValueError:
                     await interaction.followup.send("ID de canal inválido. Por favor, insira um número.", ephemeral=True)
         
-        current_settings = await self.db.fetch_one("SELECT leave_channel_id FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_settings = await self.db.fetch_one(adapt_query_placeholders("SELECT leave_channel_id FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         current_channel_id = current_settings[0] if current_settings else None
         await interaction.response.send_modal(LeaveChannelModal(parent_view=self, current_channel_id=current_channel_id)) # db_manager removido
 
@@ -605,7 +606,7 @@ class LeaveConfigView(ui.View):
                     logging.error(f"Erro ao definir mensagem de saídas no DB para guild {original_view.guild_id}: {e}", exc_info=True)
                     await interaction.followup.send("Ocorreu um erro ao salvar a mensagem no banco de dados.", ephemeral=True)
         
-        current_settings = await self.db.fetch_one("SELECT leave_message FROM welcome_leave_messages WHERE guild_id = ?", (self.guild_id,)) # Usando self.db
+        current_settings = await self.db.fetch_one(adapt_query_placeholders("SELECT leave_message FROM welcome_leave_messages WHERE guild_id = ?"), (self.guild_id,)) # Usando self.db
         current_message = current_settings[0] if current_settings and current_settings[0] else ""
         await interaction.response.send_modal(LeaveMessageModal(parent_view=self, current_message=current_message)) # db_manager removido
 
@@ -777,7 +778,7 @@ class WelcomeLeaveSystem(commands.Cog):
         logging.info("Tentando carregar painéis de Boas-Vindas/Saídas persistentes...")
         panel_datas = []
         try:
-            panel_datas = await self.db.fetch_all("SELECT guild_id, panel_channel_id, panel_message_id FROM welcome_leave_panel_settings") # Usando self.db
+        panel_datas = await self.db.fetch_all(adapt_query_placeholders("SELECT guild_id, panel_channel_id, message_id FROM welcome_leave_panel_settings")) # Usando self.db
         except Exception as e:
             logging.error(f"Erro ao buscar painéis persistentes de Boas-Vindas/Saídas do DB: {e}", exc_info=True)
             return # Aborta se houver erro no DB
@@ -789,7 +790,7 @@ class WelcomeLeaveSystem(commands.Cog):
                 if channel_id is None or message_id is None:
                     logging.warning(f"[ensure_persistent_views] Pulando entrada inválida no DB para guild {guild_id} (channel_id ou message_id é None). Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao deletar entrada inválida do painel de Boas-Vindas/Saídas no DB: {e}", exc_info=True)
                     continue 
@@ -799,7 +800,7 @@ class WelcomeLeaveSystem(commands.Cog):
                     if not guild:
                         logging.warning(f"Guild {guild_id} não encontrada para painel persistente de Boas-Vindas/Saídas. Removendo do DB.")
                         try:
-                            await self.db.execute_query("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                            await self.db.execute_query(adapt_query_placeholders("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                         except Exception as e:
                             logging.error(f"Erro ao deletar painel de Boas-Vindas/Saídas do DB após guild não encontrada: {e}", exc_info=True)
                         continue
@@ -808,7 +809,7 @@ class WelcomeLeaveSystem(commands.Cog):
                     if not isinstance(channel, discord.TextChannel):
                         logging.warning(f"Canal {channel_id} não é de texto para painel persistente de Boas-Vindas/Saídas na guild {guild_id}. Removendo do DB.")
                         try:
-                            await self.db.execute_query("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?", (guild_id,)) # Usando self.db
+                            await self.db.execute_query(adapt_query_placeholders("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?"), (guild_id,)) # Usando self.db
                         except Exception as e:
                             logging.error(f"Erro ao deletar painel de Boas-Vindas/Saídas do DB após canal não ser de texto: {e}", exc_info=True)
                         continue
@@ -821,7 +822,7 @@ class WelcomeLeaveSystem(commands.Cog):
                 except discord.NotFound:
                     logging.warning(f"Mensagem do painel de Boas-Vindas/Saídas ({message_id}) ou canal ({channel_id}) não encontrada. Removendo do DB para evitar carregamentos futuros.")
                     try:
-                        await self.db.execute_query("DELETE FROM welcome_leave_panel_settings WHERE message_id = ?", (message_id,)) # Usando self.db
+                        await self.db.execute_query(adapt_query_placeholders("DELETE FROM welcome_leave_panel_settings WHERE message_id = ?"), (message_id,)) # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao deletar painel de Boas-Vindas/Saídas do DB após mensagem/canal não encontrado: {e}", exc_info=True)
                 except discord.Forbidden:
@@ -947,7 +948,7 @@ class WelcomeLeaveSystem(commands.Cog):
         old_panel_data = None
         try:
             old_panel_data = await self.db.fetch_one(
-                "SELECT panel_channel_id, panel_message_id FROM welcome_leave_panel_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT panel_channel_id, panel_message_id FROM welcome_leave_panel_settings WHERE guild_id = ?"),
                 (guild_id,)
             )
         except Exception as e:
@@ -973,7 +974,7 @@ class WelcomeLeaveSystem(commands.Cog):
                 logging.error(f"[setup_welcome_leave_panel] Erro ao deletar painel antigo: {e}", exc_info=True)
             
             try:
-                await self.db.execute_query("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?", (guild_id,))
+                await self.db.execute_query(adapt_query_placeholders("DELETE FROM welcome_leave_panel_settings WHERE guild_id = ?"), (guild_id,))
             except Exception as e:
                 logging.error(f"Erro ao deletar entrada antiga do painel de boas-vindas/saídas do DB para guild {guild_id}: {e}", exc_info=True)
         elif old_panel_data: 
@@ -999,7 +1000,7 @@ class WelcomeLeaveSystem(commands.Cog):
             logging.info(f"[setup_welcome_leave_panel] Tentando salvar no DB: guild_id={guild_id}, channel_id={interaction.channel.id}, message_id={panel_message.id}")
 
             success_db_insert = await self.db.execute_query(
-                "INSERT OR REPLACE INTO welcome_leave_panel_settings (guild_id, panel_channel_id, panel_message_id) VALUES (?, ?, ?)",
+                adapt_query_placeholders("INSERT OR REPLACE INTO welcome_leave_panel_settings (guild_id, panel_channel_id, panel_message_id) VALUES (?, ?, ?)"),
                 (guild_id, interaction.channel.id, panel_message.id)
             )
             if success_db_insert:

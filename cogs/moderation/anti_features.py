@@ -4,6 +4,7 @@ from discord import app_commands, ui
 import logging
 import json
 import asyncio
+from database import adapt_query_placeholders
 
 logger = logging.getLogger(__name__)
 
@@ -154,10 +155,10 @@ class AntiSpamConfigModal(ui.Modal, title="Configurar Anti-Spam"):
                 "log_channel_id": self.current_config.get("log_channel_id", DEFAULT_ANTI_SPAM_CONFIG["log_channel_id"])
             }
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)", (self.guild_id,)
+                adapt_query_placeholders("INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)"), (self.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE anti_features_settings SET anti_spam_config_json = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE anti_features_settings SET anti_spam_config_json = ? WHERE guild_id = ?"),
                 (json.dumps(new_config), self.guild_id)
             )
             await interaction.followup.send("Configurações de Anti-Spam salvas com sucesso!", ephemeral=True)
@@ -208,10 +209,10 @@ class AntiLinkConfigModal(ui.Modal, title="Configurar Anti-Link"):
                 "log_channel_id": self.current_config.get("log_channel_id", DEFAULT_ANTI_LINK_CONFIG["log_channel_id"])
             }
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)", (self.guild_id,)
+                adapt_query_placeholders("INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)"), (self.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE anti_features_settings SET anti_link_config_json = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE anti_features_settings SET anti_link_config_json = ? WHERE guild_id = ?"),
                 (json.dumps(new_config), self.guild_id)
             )
             await interaction.followup.send("Configurações de Anti-Link salvas com sucesso!", ephemeral=True)
@@ -261,10 +262,10 @@ class AntiInviteConfigModal(ui.Modal, title="Configurar Anti-Convite"):
                 "log_channel_id": self.current_config.get("log_channel_id", DEFAULT_ANTI_INVITE_CONFIG["log_channel_id"])
             }
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)", (self.guild_id,)
+                adapt_query_placeholders("INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)"), (self.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE anti_features_settings SET anti_invite_config_json = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE anti_features_settings SET anti_invite_config_json = ? WHERE guild_id = ?"),
                 (json.dumps(new_config), self.guild_id)
             )
             await interaction.followup.send("Configurações de Anti-Convite salvas com sucesso!", ephemeral=True)
@@ -314,10 +315,10 @@ class AntiFloodConfigModal(ui.Modal, title="Configurar Anti-Flood"):
                 "log_channel_id": self.current_config.get("log_channel_id", DEFAULT_ANTI_FLOOD_CONFIG["log_channel_id"])
             }
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)", (self.guild_id,)
+                adapt_query_placeholders("INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)"), (self.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE anti_features_settings SET anti_flood_config_json = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE anti_features_settings SET anti_flood_config_json = ? WHERE guild_id = ?"),
                 (json.dumps(new_config), self.guild_id)
             )
             await interaction.followup.send("Configurações de Anti-Flood salvas com sucesso!", ephemeral=True)
@@ -345,7 +346,7 @@ class AntiFeaturesControlView(ui.View):
     async def _get_guild_config(self, guild_id: int):
         """Busca as configurações JSON para um guild_id."""
         settings = await self.bot.db_connection.fetch_one(
-            "SELECT anti_spam_config_json, anti_link_config_json, anti_invite_config_json, anti_flood_config_json FROM anti_features_settings WHERE guild_id = ?",
+            adapt_query_placeholders("SELECT anti_spam_config_json, anti_link_config_json, anti_invite_config_json, anti_flood_config_json FROM anti_features_settings WHERE guild_id = ?"),
             (guild_id,)
         )
         configs = {
@@ -410,9 +411,8 @@ class AntiFeaturesControlView(ui.View):
         # Tenta editar a mensagem original do painel
         try:
             panel_settings = await self.bot.db_connection.fetch_one(
-                "SELECT panel_channel_id, panel_message_id FROM anti_features_settings WHERE guild_id = ?",
+                adapt_query_placeholders("SELECT panel_channel_id, panel_message_id FROM anti_features_settings WHERE guild_id = ?"),
                 (interaction.guild_id,)
-            )
             if panel_settings and panel_settings['panel_channel_id'] and panel_settings['panel_message_id']:
                 channel = self.bot.get_channel(panel_settings['panel_channel_id'])
                 if channel:
@@ -551,11 +551,11 @@ class AntiFeatures(commands.Cog):
         try:
             message = await channel.send(embed=embed, view=view)
             await self.bot.db_connection.execute_query(
-                "INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)",
+                adapt_query_placeholders("INSERT OR IGNORE INTO anti_features_settings (guild_id) VALUES (?)"),
                 (interaction.guild_id,)
             )
             await self.bot.db_connection.execute_query(
-                "UPDATE anti_features_settings SET panel_channel_id = ?, panel_message_id = ? WHERE guild_id = ?",
+                adapt_query_placeholders("UPDATE anti_features_settings SET panel_channel_id = ?, panel_message_id = ? WHERE guild_id = ?"),
                 (channel.id, message.id, interaction.guild_id)
             )
             await interaction.followup.send(f"Painel de controle Anti-Recursos enviado e configurado para {channel.mention}!", ephemeral=True)
