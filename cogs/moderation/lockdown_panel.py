@@ -95,7 +95,6 @@ class LockdownPanelView(ui.View):
                 logging.error(f"Erro ao deletar painel de lockdown do DB após mensagem não encontrada: {e}", exc_info=True)
             if panel_channel:
                 await panel_channel.send(f"⚠️ O painel de lockdown foi perdido! Por favor, use `/lockdown_panel setup` para configurá-lo novamente.", delete_after=30)
-                except: pass
             return
         except discord.Forbidden:
             logging.error(f"[refresh_panel_lockdown] Bot sem permissão para ler histórico de mensagens no canal {panel_channel_id}. Não é possível atualizar o painel.")
