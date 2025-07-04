@@ -94,7 +94,7 @@ class LockdownPanelView(ui.View):
             except Exception as e:
                 logging.error(f"Erro ao deletar painel de lockdown do DB após mensagem não encontrada: {e}", exc_info=True)
             if panel_channel:
-                try: await panel_channel.send(f"⚠️ O painel de lockdown foi perdido! Por favor, use `/lockdown_panel setup` para configurá-lo novamente.", delete_after=30)
+                await panel_channel.send(f"⚠️ O painel de lockdown foi perdido! Por favor, use `/lockdown_panel setup` para configurá-lo novamente.", delete_after=30)
                 except: pass
             return
         except discord.Forbidden:

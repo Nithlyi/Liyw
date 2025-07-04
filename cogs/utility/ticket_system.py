@@ -681,13 +681,14 @@ class TicketPanelView(ui.View):
             logging.error(f"Unknown interaction ao deferir open_ticket para o usuário {interaction.user.id} na guild {interaction.guild_id}.")
             return
 
+
+        # Corrigido: Usar $1 e $2 para os parâmetros guild_id e user_id na consulta
         existing_ticket = await self.bot.db_connection.fetch_one(
             adapt_query_placeholders("SELECT channel_id FROM active_tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'"),
             (interaction.guild_id, interaction.user.id)
         )
         if existing_ticket:
             channel = self.bot.get_channel(existing_ticket['channel_id'])
-            if channel:
                 await interaction.followup.send(f"Você já tem um ticket aberto em {channel.mention}.", ephemeral=True)
                 return
             else:
@@ -942,9 +943,21 @@ class TicketSystem(commands.Cog):
     @app_commands.describe(channel="O canal onde o painel de tickets será enviado.")
     @app_commands.default_permissions(administrator=True)
     async def set_ticket_channel(self, interaction: discord.Interaction, channel: discord.TextChannel):
-        logging.info(f"Deferring response for set_ticket_channel in guild {interaction.guild_id}")
-        await interaction.response.defer(ephemeral=True)
-        logging.info(f"Deferred response for set_ticket_channel in guild {interaction.guild_id}")
+        logging.info(f"Attempting to defer response for set_ticket_channel in guild {interaction.guild_id}")
+        try:
+            await interaction.response.defer(ephemeral=True)
+            logging.info(f"Successfully deferred response for set_ticket_channel in guild {interaction.guild_id}")
+        except discord.NotFound:
+            logging.error(f"Failed to defer response for set_ticket_channel: Unknown interaction for guild {interaction.guild_id}")
+            return # Exit command if defer fails
+        except Exception as e:
+            logging.error(f"An unexpected error occurred during defer for set_ticket_channel in guild {interaction.guild_id}: {e}", exc_info=True)
+            # Attempt to send a followup message if defer failed unexpectedly
+            try:
+                 await interaction.followup.send("Ocorreu um erro ao processar seu comando. Por favor, tente novamente.", ephemeral=True)
+            except Exception:
+                 pass # Ignore errors sending followup if interaction is truly dead
+            return # Exit command if defer fails
 
         panel_settings = await self.bot.db_connection.fetch_one(
             adapt_query_placeholders("SELECT panel_embed_json FROM ticket_settings WHERE guild_id = ?"),
@@ -993,9 +1006,22 @@ class TicketSystem(commands.Cog):
     @app_commands.describe(category="A categoria para os canais de ticket.")
     @app_commands.default_permissions(administrator=True)
     async def set_ticket_category(self, interaction: discord.Interaction, category: discord.CategoryChannel):
-        logging.info(f"Deferring response for set_ticket_category in guild {interaction.guild_id}")
-        await interaction.response.defer(ephemeral=True)
-        logging.info(f"Deferred response for set_ticket_category in guild {interaction.guild_id}")
+        logging.info(f"Attempting to defer response for set_ticket_category in guild {interaction.guild_id}")
+        try:
+            await interaction.response.defer(ephemeral=True)
+            logging.info(f"Successfully deferred response for set_ticket_category in guild {interaction.guild_id}")
+        except discord.NotFound:
+            logging.error(f"Failed to defer response for set_ticket_category: Unknown interaction for guild {interaction.guild_id}")
+            return # Exit command if defer fails
+        except Exception as e:
+            logging.error(f"An unexpected error occurred during defer for set_ticket_category in guild {interaction.guild_id}: {e}", exc_info=True)
+            # Attempt to send a followup message if defer failed unexpectedly
+            try:
+                 await interaction.followup.send("Ocorreu um erro ao processar seu comando. Por favor, tente novamente.", ephemeral=True)
+            except Exception:
+                 pass # Ignore errors sending followup if interaction is truly dead
+            return # Exit command if defer fails
+
         await self.bot.db_connection.execute_query(
             "INSERT OR IGNORE INTO ticket_settings (guild_id) VALUES (?)",
             (interaction.guild_id,)
