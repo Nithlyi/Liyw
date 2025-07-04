@@ -692,8 +692,9 @@ class TicketPanelView(ui.View):
             await interaction.followup.send(f"Você já tem um ticket aberto em {channel.mention}.", ephemeral=True)
             return
         else:
-            await self.bot.db_connection.execute_query(adapt_query_placeholders("DELETE FROM active_tickets WHERE channel_id = $1"), (existing_ticket['channel_id'],))
-            logging.warning(f"Registro de ticket obsoleto para o usuário {interaction.user.id} na guild {interaction.guild_id} removido.")
+            if existing_ticket is not None:
+                await self.bot.db_connection.execute_query(adapt_query_placeholders("DELETE FROM active_tickets WHERE channel_id = $1"), (existing_ticket['channel_id'],))
+                logging.warning(f"Registro de ticket obsoleto para o usuário {interaction.user.id} na guild {interaction.guild_id} removido.")
 
         settings = await self.bot.db_connection.fetch_one(
             adapt_query_placeholders("SELECT category_id, support_role_id, ticket_initial_embed_json FROM ticket_settings WHERE guild_id = $1"),
