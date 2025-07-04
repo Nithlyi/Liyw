@@ -6,7 +6,7 @@ import logging
 import re
 
 # Não precisamos importar execute_query diretamente, pois usaremos self.db.
-# from database import execute_query 
+# from database import execute_query
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -28,15 +28,15 @@ def parse_duration(duration_str: str) -> datetime.timedelta:
             seconds += value * 3600
         elif unit == 'd':
             seconds += value * 86400
-    if seconds > 2419200: # 28 dias em segundos
+    if seconds > 2419200:  # 28 dias em segundos
         raise ValueError("A duração máxima para silenciamento é de 28 dias.")
     return datetime.timedelta(seconds=seconds)
 
 
 class LockdownCore(commands.Cog):
-    def __init__(self, bot: commands.Bot): # db_manager removido daqui
+    def __init__(self, bot: commands.Bot):  # db_manager removido daqui
         self.bot = bot
-        self.db = bot.db_connection # Armazena a instância do gerenciador de DB
+        self.db = bot.db_connection  # Armazena a instância do gerenciador de DB
         self.lockdown_check.start()
         logging.info("LockdownCore cog inicializado.")
 
@@ -47,7 +47,7 @@ class LockdownCore(commands.Cog):
     async def _is_channel_locked(self, channel_id: int) -> bool:
         """Verifica se um canal está em lockdown no DB."""
         try:
-            result = await self.db.fetch_one( # Usando self.db.fetch_one
+            result = await self.db.fetch_one(  # Usando self.db.fetch_one
                 "SELECT channel_id FROM locked_channels WHERE channel_id = ?",
                 (channel_id,)
             )
@@ -69,41 +69,41 @@ class LockdownCore(commands.Cog):
             return False, "Erro: Bot sem permissões necessárias ('Gerenciar Cargos' ou 'Gerenciar Canais') para modificar este canal."
 
         if lock:
-            current_perms = channel.overwrites_for(everyone_role) # Obter as permissões atuais
+            current_perms = channel.overwrites_for(everyone_role)  # Obter as permissões atuais
             current_perms.send_messages = False
-            
+
             db_query = "INSERT OR REPLACE INTO locked_channels (channel_id, guild_id, locked_until_timestamp, reason, locked_by_id) VALUES (?, ?, ?, ?, ?)"
             locked_until = None
             if duration_seconds:
                 locked_until = int(time.time()) + duration_seconds
-            
+
             db_success = False
             try:
-                db_success = await self.db.execute_query(db_query, (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None)) # Usando self.db
+                db_success = await self.db.execute_query(db_query, (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None))  # Usando self.db
             except Exception as e:
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
             if not db_success:
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")
                 return False, "Erro no banco de dados ao registrar lockdown."
-            
+
             status_message = "bloqueado"
             log_message = f"Lockdown ativado em #{channel.name} ({channel.id}) por {locked_by.name if locked_by else 'Desconhecido'}. Razão: '{reason}'. Duração: {duration_seconds}s"
         else:
-            current_perms = channel.overwrites_for(everyone_role) # Obter as permissões atuais
-            current_perms.send_messages = None # Reseta para o estado neutro, permitindo que as permissões do servidor prevaleçam
-            
+            current_perms = channel.overwrites_for(everyone_role)  # Obter as permissões atuais
+            current_perms.send_messages = None  # Reseta para o estado neutro, permitindo que as permissões do servidor prevaleçam
+
             db_query = "DELETE FROM locked_channels WHERE channel_id = ?"
             db_success = False
             try:
-                db_success = await self.db.execute_query(db_query, (channel.id,)) # Usando self.db
+                db_success = await self.db.execute_query(db_query, (channel.id,))  # Usando self.db
             except Exception as e:
                 logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
             if not db_success:
                 logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}).")
                 return False, "Erro no banco de dados ao remover lockdown."
-            
+
             status_message = "desbloqueado"
             log_message = f"Lockdown desativado em #{channel.name} ({channel.id})."
 
@@ -116,7 +116,7 @@ class LockdownCore(commands.Cog):
             return False, "Erro: Não tenho permissão para modificar as permissões deste canal. Verifique as permissões 'Gerenciar Cargos' e 'Gerenciar Canais' para o cargo do bot e a hierarquia de cargos."
         except Exception as e:
             logging.error(f"Erro inesperado ao alternar lockdown em #{channel.name} ({channel.id}): {e}", exc_info=True)
-            return False, f"Erro interno: {e}" 
+            return False, f"Erro interno: {e}"
 
     async def _send_lockdown_message(self, channel: discord.TextChannel, is_locked: bool, reason: str, duration_seconds: int = None):
         """Envia uma mensagem informativa sobre o estado de lockdown."""
@@ -150,16 +150,17 @@ class LockdownCore(commands.Cog):
     async def lockdown_check(self):
         await self.bot.wait_until_ready()
 
-        current_time = int(time.time())
+        current_time = datetime.datetime.utcnow()  # Obter o tempo atual em UTC
         expired_lockdowns = []
         try:
-            expired_lockdowns = await self.db.fetch_all( # Usando self.db.fetch_all
-                "SELECT channel_id, guild_id, reason FROM locked_channels WHERE locked_until_timestamp IS NOT NULL AND locked_until_timestamp <= ?",
+            expired_lockdowns = await self.db.fetch_all(
+                "SELECT channel_id, guild_id, reason FROM locked_channels WHERE locked_until_timestamp IS NOT NULL AND locked_until_timestamp <= $1",
                 (current_time,)
             )
         except Exception as e:
             logging.error(f"Erro ao buscar lockdowns expirados do DB: {e}", exc_info=True)
-            return # Não continua se houver erro no DB
+            return
+
 
         if expired_lockdowns:
             logging.info(f"Encontrados {len(expired_lockdowns)} canais com lockdown expirado.")
@@ -168,7 +169,7 @@ class LockdownCore(commands.Cog):
                 if not guild:
                     logging.warning(f"Guild {guild_id} não encontrada para lockdown expirado do canal {channel_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,)) # Usando self.db
+                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após guild não encontrada: {e}", exc_info=True)
                     continue
@@ -177,11 +178,11 @@ class LockdownCore(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     logging.warning(f"Canal {channel_id} não encontrado ou não é de texto para lockdown expirado na guild {guild_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,)) # Usando self.db
+                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após canal não encontrado: {e}", exc_info=True)
                     continue
-                
+
                 logging.info(f"Desbloqueando canal {channel.name} ({channel.id}) automaticamente.")
                 success, _ = await self._toggle_lockdown(channel, False, f"Lockdown automático expirado. Motivo original: {reason}")
                 if success:
@@ -194,12 +195,12 @@ class LockdownCore(commands.Cog):
         logging.info("Iniciando verificação de lockdown persistente...")
         all_locked_channels = []
         try:
-            all_locked_channels = await self.db.fetch_all( # Usando self.db.fetch_all
+            all_locked_channels = await self.db.fetch_all(  # Usando self.db.fetch_all
                 "SELECT channel_id, guild_id, reason, locked_by_id, locked_until_timestamp FROM locked_channels"
             )
         except Exception as e:
             logging.error(f"Erro ao buscar lockdowns persistentes do DB no carregamento: {e}", exc_info=True)
-            return # Não continua se houver erro no DB
+            return  # Não continua se houver erro no DB
 
         if all_locked_channels:
             logging.info(f"Encontrados {len(all_locked_channels)} canais com lockdown persistente no DB.")
@@ -208,7 +209,7 @@ class LockdownCore(commands.Cog):
                 if not guild:
                     logging.warning(f"Guild {guild_id} não encontrada para canal {channel_id} no carregamento. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,)) # Usando self.db
+                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após guild não encontrada no carregamento: {e}", exc_info=True)
                     continue
@@ -217,11 +218,11 @@ class LockdownCore(commands.Cog):
                 if not channel or not isinstance(channel, discord.TextChannel):
                     logging.warning(f"Canal {channel_id} não encontrado ou não é de texto no carregamento para guild {guild_id}. Removendo do DB.")
                     try:
-                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,)) # Usando self.db
+                        await self.db.execute_query("DELETE FROM locked_channels WHERE channel_id = ?", (channel_id,))  # Usando self.db
                     except Exception as e:
                         logging.error(f"Erro ao remover canal {channel_id} do DB após canal não encontrado no carregamento: {e}", exc_info=True)
                     continue
-                
+
                 # Se o lockdown já expirou na hora do carregamento, desbloqueia e remove do DB
                 if locked_until_timestamp and locked_until_timestamp <= int(time.time()):
                     logging.info(f"Lockdown para canal {channel.name} ({channel.id}) já expirou no carregamento. Desbloqueando.")
@@ -231,10 +232,10 @@ class LockdownCore(commands.Cog):
                     # Recalcula a duração restante para passar para _toggle_lockdown, se houver
                     remaining_duration = (locked_until_timestamp - int(time.time())) if locked_until_timestamp else None
                     success, _ = await self._toggle_lockdown(
-                        channel, 
-                        True, 
-                        reason, 
-                        guild.get_member(locked_by_id) if locked_by_id else None, 
+                        channel,
+                        True,
+                        reason,
+                        guild.get_member(locked_by_id) if locked_by_id else None,
                         remaining_duration
                     )
                     if not success:
@@ -243,9 +244,9 @@ class LockdownCore(commands.Cog):
             logging.info("Nenhum canal em lockdown persistente para carregar.")
 
 
-async def setup(bot: commands.Bot): # db_manager removido daqui
+async def setup(bot: commands.Bot):  # db_manager removido daqui
     """
     Função de setup para adicionar o cog ao bot.
     """
-    await bot.add_cog(LockdownCore(bot)) # db_manager removido daqui
+    await bot.add_cog(LockdownCore(bot))  # db_manager removido daqui
     logging.info("LockdownCore cog adicionado ao bot.")

@@ -33,86 +33,85 @@ def adapt_query_placeholders(query: str) -> str:
 class DatabaseManager:
     """
     Manages the asynchronous PostgreSQL database connection and operations.
-    Provides methods for executing queries, fetching single rows, and fetching all rows.
+    Uses a connection pool for efficient connection management.
     """
-    def __init__(self, dsn: str):
+    def __init__(self, dsn: str, min_size: int = 1, max_size: int = 10):
         self.dsn = dsn  # Data Source Name (connection string)
-        self.conn = None
+        self.pool = None
+        self.min_size = min_size
+        self.max_size = max_size
 
     async def connect(self):
-        """Establishes the database connection."""
-        if self.conn is None:
-            try:
-                self.conn = await asyncpg.connect(self.dsn)
-                logger.info("Conexão com o banco de dados PostgreSQL estabelecida.")
-            except Exception as e:
-                logger.critical(f"Falha ao conectar ao banco de dados PostgreSQL: {e}", exc_info=True)
-                raise  # Re-raise the exception
+        """Establishes the database connection pool."""
+        try:
+            self.pool = await asyncpg.create_pool(self.dsn, min_size=self.min_size, max_size=self.max_size)
+            logger.info("Pool de conexões com o banco de dados PostgreSQL estabelecida.")
+        except Exception as e:
+            logger.critical(f"Falha ao criar pool de conexões com o banco de dados PostgreSQL: {e}", exc_info=True)
+            raise  # Re-raise the exception
 
     async def close(self):
-        """Closes the database connection."""
-        if self.conn:
-            await self.conn.close()
-            self.conn = None
-            logger.info("Conexão com o banco de dados PostgreSQL fechada.")
+        """Closes the database connection pool."""
+        if self.pool:
+            await self.pool.close()
+            self.pool = None
+            logger.info("Pool de conexões com o banco de dados PostgreSQL fechada.")
 
     async def execute_query(self, query: str, params: tuple = ()) -> bool:
         """
-        Executes a database query (INSERT, UPDATE, DELETE).
+        Executes a database query (INSERT, UPDATE, DELETE) using a connection from the pool.
         Returns True on success, False on error.
         """
-        await self.connect()  # Ensure connection is open
-        try:
-            # Use the adapter for placeholders
-            adapted_query = adapt_query_placeholders(query)
-            await self.conn.execute(adapted_query, *params)  # asyncpg takes params unpacked
-            return True
-        except asyncpg.exceptions.PostgresError as e:
-            logger.error(f"Erro ao executar query: {query} com params {params}. Erro: {e}", exc_info=True)
-            return False
-        except Exception as e:
-            logger.error(f"Erro inesperado ao executar query: {query} com params {params}. Erro: {e}", exc_info=True)
-            return False
+        async with self.pool.acquire() as conn:
+            try:
+                # Use the adapter for placeholders
+                adapted_query = adapt_query_placeholders(query)
+                await conn.execute(adapted_query, *params)  # asyncpg takes params unpacked
+                return True
+            except asyncpg.exceptions.PostgresError as e:
+                logger.error(f"Erro ao executar query: {query} com params {params}. Erro: {e}", exc_info=True)
+                return False
+            except Exception as e:
+                logger.error(f"Erro inesperado ao executar query: {query} com params {params}. Erro: {e}", exc_info=True)
+                return False
 
-
-    async def fetch_one(self, query: str, params: tuple = ()):
+    async def fetch_one(self, query: str, params: tuple = ()) -> None:
         """
-        Fetches a single row from the database.
+        Fetches a single row from the database using a connection from the pool.
         Returns the row as a Record object (dictionary-like) or None if no row is found.
         """
-        await self.connect()  # Ensure connection is open
-        try:
-            # Use the adapter for placeholders
-            adapted_query = adapt_query_placeholders(query)
-            return await self.conn.fetchrow(adapted_query, *params)  # asyncpg takes params unpacked
-        except asyncpg.exceptions.PostgresError as e:
-            logger.error(f"Erro ao buscar uma linha: {query} com params {params}. Erro: {e}", exc_info=True)
-            return None
-        except Exception as e:
-            logger.error(f"Erro inesperado ao buscar uma linha: {query} com params {params}. Erro: {e}", exc_info=True)
-            return None
+        async with self.pool.acquire() as conn:
+            try:
+                # Use the adapter for placeholders
+                adapted_query = adapt_query_placeholders(query)
+                return await conn.fetchrow(adapted_query, *params)  # asyncpg takes params unpacked
+            except asyncpg.exceptions.PostgresError as e:
+                logger.error(f"Erro ao buscar uma linha: {query} com params {params}. Erro: {e}", exc_info=True)
+                return None
+            except Exception as e:
+                logger.error(f"Erro inesperado ao buscar uma linha: {query} com params {params}. Erro: {e}", exc_info=True)
+                return None
 
-
-    async def fetch_all(self, query: str, params: tuple = ()):
+    async def fetch_all(self, query: str, params: tuple = ()) -> list:
         """
-        Fetches all rows from the database.
+        Fetches all rows from the database using a connection from the pool.
         Returns a list of Record objects (dictionary-like) or an empty list.
         """
-        await self.connect()  # Ensure connection is open
-        try:
-            # Use the adapter for placeholders
-            adapted_query = adapt_query_placeholders(query)
-            return await self.conn.fetch(adapted_query, *params)  # asyncpg takes params unpacked
-        except asyncpg.exceptions.PostgresError as e:
-            logger.error(f"Erro ao buscar todas as linhas: {query} com params {params}. Erro: {e}", exc_info=True)
-            return []
-        except Exception as e:
-            logger.error(f"Erro inesperado ao buscar todas as linhas: {query} com params {params}. Erro: {e}", exc_info=True)
-            return []
+        async with self.pool.acquire() as conn:
+            try:
+                # Use the adapter for placeholders
+                adapted_query = adapt_query_placeholders(query)
+                return await conn.fetch(adapted_query, *params)  # asyncpg takes params unpacked
+            except asyncpg.exceptions.PostgresError as e:
+                logger.error(f"Erro ao buscar todas as linhas: {query} com params {params}. Erro: {e}", exc_info=True)
+                return []
+            except Exception as e:
+                logger.error(f"Erro inesperado ao buscar todas as linhas: {query} com params {params}. Erro: {e}", exc_info=True)
+                return []
 
 async def init_db() -> DatabaseManager:
     """
-    Initializes the PostgreSQL database connection, creates necessary tables (if they don't exist),
+    Initializes the PostgreSQL database connection pool, creates necessary tables (if they don't exist),
     and returns an instance of DatabaseManager.
     Reads connection URL from DATABASE_URL environment variable.
     """
@@ -122,19 +121,9 @@ async def init_db() -> DatabaseManager:
         logger.critical("Variável de ambiente DATABASE_URL não encontrada. Falha ao conectar ao banco de dados.")
         raise ValueError("DATABASE_URL environment variable not set.")
 
-    # Remove SQLite specific path creation logic
-    # db_dir = os.path.dirname(DATABASE_PATH)
-    # if db_dir and not os.path.exists(db_dir):
-    #     try:
-    #         os.makedirs(db_dir)
-    #         logger.info(f"Diretório do banco de dados criado: {db_dir}")
-    #     except OSError as e:
-    #         logger.critical(f"Falha ao criar o diretório do banco de dados '{db_dir}': {e}")
-    #         raise
-
     db_manager = DatabaseManager(DATABASE_URL)
     try:
-        await db_manager.connect()  # Connect using the manager
+        await db_manager.connect()  # Connect using the manager, which now creates the pool
         logger.info(f"Conectado ao banco de dados PostgreSQL usando URL.")
 
         # Create tables if they don't exist (PostgreSQL syntax)
@@ -290,11 +279,11 @@ async def init_db() -> DatabaseManager:
         return db_manager
     except asyncpg.exceptions.PostgresError as e:
         logger.critical(f"Falha crítica ao inicializar o banco de dados PostgreSQL: {e}")
-        if db_manager.conn:
+        if db_manager.pool:
             await db_manager.close()
         raise
     except Exception as e:
         logger.critical(f"Um erro inesperado ocorreu durante a inicialização do banco de dados PostgreSQL: {e}", exc_info=True)
-        if db_manager.conn:
+        if db_manager.pool:
             await db_manager.close()
         raise
