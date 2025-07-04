@@ -2,7 +2,7 @@ import asyncpg
 import os
 import logging
 import datetime
-import re # Importado para a substituição de placeholders
+import re  # Importado para a substituição de placeholders
 
 # Configure logging for the database module
 logger = logging.getLogger(__name__)
@@ -11,21 +11,21 @@ logger = logging.getLogger(__name__)
 # Example: postgres://user:password@host:port/database
 DATABASE_URL = os.getenv('DATABASE_URL')
 
-# Helper function to adapt SQLite ''?'' placeholders to PostgreSQL '$N'
+# Helper function to adapt SQLite '?' placeholders to PostgreSQL '$N'
 def adapt_query_placeholders(query: str) -> str:
-    """Adapts SQLite ''?'' placeholders to PostgreSQL '$N'."""
-    # This regex finds ''?'' not inside quotes
+    """Adapts SQLite '?' placeholders to PostgreSQL '$N'."""
+    # This regex finds '?' not inside quotes
     # It's a basic implementation and might fail with complex SQL
-    parts = re.split(r"('(?:[^']|'')*'|"(?:[^\"\\]|\\.)*\"|`)", query)
+    parts = re.split(r"""('(?:[^']|'')*'|"(?:[^"\\]|\\.)*"|`)""", query)
     adapted_query = ""
     param_index = 1
     for i, part in enumerate(parts):
-        if i % 2 == 0: # Not inside quotes
+        if i % 2 == 0:  # Not inside quotes
             new_part = part.replace('?', f'${param_index}')
-            # Need to correctly increment param_index for each ''?'' replaced in this part
-            param_index += part.count('?') # Count original ? in this part
+            # Need to correctly increment param_index for each '?' replaced in this part
+            param_index += part.count('?')  # Count original ? in this part
             adapted_query += new_part
-        else: # Inside quotes or backticks, leave as is
+        else:  # Inside quotes or backticks, leave as is
             adapted_query += part
     return adapted_query
 
@@ -36,7 +36,7 @@ class DatabaseManager:
     Provides methods for executing queries, fetching single rows, and fetching all rows.
     """
     def __init__(self, dsn: str):
-        self.dsn = dsn # Data Source Name (connection string)
+        self.dsn = dsn  # Data Source Name (connection string)
         self.conn = None
 
     async def connect(self):
@@ -47,7 +47,7 @@ class DatabaseManager:
                 logger.info("Conexão com o banco de dados PostgreSQL estabelecida.")
             except Exception as e:
                 logger.critical(f"Falha ao conectar ao banco de dados PostgreSQL: {e}", exc_info=True)
-                raise # Re-raise the exception
+                raise  # Re-raise the exception
 
     async def close(self):
         """Closes the database connection."""
@@ -61,11 +61,11 @@ class DatabaseManager:
         Executes a database query (INSERT, UPDATE, DELETE).
         Returns True on success, False on error.
         """
-        await self.connect() # Ensure connection is open
+        await self.connect()  # Ensure connection is open
         try:
             # Use the adapter for placeholders
             adapted_query = adapt_query_placeholders(query)
-            await self.conn.execute(adapted_query, *params) # asyncpg takes params unpacked
+            await self.conn.execute(adapted_query, *params)  # asyncpg takes params unpacked
             return True
         except asyncpg.exceptions.PostgresError as e:
             logger.error(f"Erro ao executar query: {query} com params {params}. Erro: {e}", exc_info=True)
@@ -80,11 +80,11 @@ class DatabaseManager:
         Fetches a single row from the database.
         Returns the row as a Record object (dictionary-like) or None if no row is found.
         """
-        await self.connect() # Ensure connection is open
+        await self.connect()  # Ensure connection is open
         try:
             # Use the adapter for placeholders
             adapted_query = adapt_query_placeholders(query)
-            return await self.conn.fetchrow(adapted_query, *params) # asyncpg takes params unpacked
+            return await self.conn.fetchrow(adapted_query, *params)  # asyncpg takes params unpacked
         except asyncpg.exceptions.PostgresError as e:
             logger.error(f"Erro ao buscar uma linha: {query} com params {params}. Erro: {e}", exc_info=True)
             return None
@@ -98,11 +98,11 @@ class DatabaseManager:
         Fetches all rows from the database.
         Returns a list of Record objects (dictionary-like) or an empty list.
         """
-        await self.connect() # Ensure connection is open
+        await self.connect()  # Ensure connection is open
         try:
             # Use the adapter for placeholders
             adapted_query = adapt_query_placeholders(query)
-            return await self.conn.fetch(adapted_query, *params) # asyncpg takes params unpacked
+            return await self.conn.fetch(adapted_query, *params)  # asyncpg takes params unpacked
         except asyncpg.exceptions.PostgresError as e:
             logger.error(f"Erro ao buscar todas as linhas: {query} com params {params}. Erro: {e}", exc_info=True)
             return []
@@ -134,7 +134,7 @@ async def init_db() -> DatabaseManager:
 
     db_manager = DatabaseManager(DATABASE_URL)
     try:
-        await db_manager.connect() # Connect using the manager
+        await db_manager.connect()  # Connect using the manager
         logger.info(f"Conectado ao banco de dados PostgreSQL usando URL.")
 
         # Create tables if they don't exist (PostgreSQL syntax)
