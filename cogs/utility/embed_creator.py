@@ -573,8 +573,8 @@ class EmbedCreatorCog(commands.Cog):
     @app_commands.command(name="embed_creator", description="Inicia o criador de embeds interativo.")
     @app_commands.checks.has_permissions(manage_messages=True)
     async def embed_creator(self, interaction: discord.Interaction):
-        view = EmbedCreatorMainView(self.bot) # Passa self.bot
         await interaction.response.defer(ephemeral=True)
+        view = EmbedCreatorMainView(self.bot) # Passa self.bot
         await view.update_panel(interaction)
 
     @app_commands.command(name="embed_load", description="Carrega um embed salvo para edição.")
