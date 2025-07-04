@@ -286,4 +286,4 @@ async def init_db() -> DatabaseManager:
         logger.critical(f"Um erro inesperado ocorreu durante a inicialização do banco de dados PostgreSQL: {e}", exc_info=True)
         if db_manager.pool:
             await db_manager.close()
-        raise
+        raisef
