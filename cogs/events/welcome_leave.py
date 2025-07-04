@@ -778,7 +778,7 @@ class WelcomeLeaveSystem(commands.Cog):
         logging.info("Tentando carregar painéis de Boas-Vindas/Saídas persistentes...")
         panel_datas = []
         try:
-SELECT guild_id, panel_channel_id, panel_message_id FROM welcome_leave_panel_settings
+            panel_datas = await self.db.fetch_all("SELECT guild_id, panel_channel_id, panel_message_id FROM welcome_leave_panel_settings")
         except Exception as e:
             logging.error(f"Erro ao buscar painéis persistentes de Boas-Vindas/Saídas do DB: {e}", exc_info=True)
             return # Aborta se houver erro no DB

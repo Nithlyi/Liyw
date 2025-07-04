@@ -88,10 +88,10 @@ class LockdownCore(commands.Cog):
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")
                 return False, "Erro no banco de dados ao registrar lockdown."
 
+
+        else:
             status_message = "bloqueado"
             log_message = f"Lockdown ativado em #{channel.name} ({channel.id}) por {locked_by.name if locked_by else 'Desconhecido'}. Razão: '{reason}'. Duração: {duration_seconds}s"
-        else:
-            current_perms = channel.overwrites_for(everyone_role)  # Obter as permissões atuais
             current_perms.send_messages = None  # Reseta para o estado neutro, permitindo que as permissões do servidor prevaleçam
 
             db_query = "DELETE FROM locked_channels WHERE channel_id = ?"

@@ -464,7 +464,7 @@ class LockdownPanel(commands.Cog):
 
             success_db_insert = await self.db.execute_query( # Usando self.db
                 adapt_query_placeholders("INSERT OR REPLACE INTO lockdown_panel_settings (guild_id, channel_id, message_id) VALUES (?, ?, ?)"),
-                (guild_id, interaction.channel.id, panel_message.id)
+                (guild_id, interaction.channel.id, panel_message.id))
             if success_db_insert:
                 logging.info(f"[setup_lockdown_panel] Dados do painel de lockdown salvos com sucesso no DB para guild {guild_id}.")
             else:
