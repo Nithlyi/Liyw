@@ -676,7 +676,8 @@ class TicketPanelView(ui.View):
     @ui.button(label="Abrir Ticket", style=discord.ButtonStyle.primary, custom_id="open_ticket_button")
     async def open_ticket(self, interaction: discord.Interaction, button: ui.Button):
         try:
-            await interaction.response.defer(ephemeral=True)
+            if not interaction.response.is_done():
+                await interaction.response.defer(ephemeral=True)
         except discord.NotFound:
             logging.error(f"Unknown interaction ao deferir open_ticket para o usuário {interaction.user.id} na guild {interaction.guild_id}.")
             return
