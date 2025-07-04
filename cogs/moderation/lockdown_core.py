@@ -84,30 +84,42 @@ class LockdownCore(commands.Cog):
             except Exception as e:
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
+
         if not db_success:
-                logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")
-                return False, "Erro no banco de dados ao registrar lockdown."
+            logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")
+            return False, "Erro no banco de dados ao registrar lockdown."
 
-
-        else:
+        # If locking was successful in DB, set channel permissions
+        if lock:
             status_message = "bloqueado"
             log_message = f"Lockdown ativado em #{channel.name} ({channel.id}) por {locked_by.name if locked_by else 'Desconhecido'}. Razão: '{reason}'. Duração: {duration_seconds}s"
+
+        else:
+            # Reset permissions for @everyone
+            current_perms = channel.overwrites_for(everyone_role)
             current_perms.send_messages = None  # Reseta para o estado neutro, permitindo que as permissões do servidor prevaleçam
 
+            # Remove from database
             db_query = "DELETE FROM locked_channels WHERE channel_id = ?"
             db_success = False
             try:
-            db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id,))  # Usando self.db
-        except Exception as e:
-            logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
+                db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id,))
+            except Exception as e:
+                logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
+                # If DB removal fails, log it but still attempt to change channel permissions
+                pass # Continue even if DB fails
 
-        if not db_success:
+            # Check if DB operation was successful (for unlocking)
+            if not db_success:
                 logging.error(f"Falha ao remover lockdown do DB para canal #{channel.name} ({channel.id}).")
+                # Decide if you want to return False here or proceed with permission change
+                # For consistency, let's return False if DB update fails.
                 return False, "Erro no banco de dados ao remover lockdown."
 
             status_message = "desbloqueado"
             log_message = f"Lockdown desativado em #{channel.name} ({channel.id})."
 
+        # This try block is outside the if/else for setting permissions
         try:
             await channel.set_permissions(everyone_role, overwrite=current_perms, reason=reason)
             logging.info(log_message)
@@ -118,7 +130,6 @@ class LockdownCore(commands.Cog):
         except Exception as e:
             logging.error(f"Erro inesperado ao alternar lockdown em #{channel.name} ({channel.id}): {e}", exc_info=True)
             return False, f"Erro interno: {e}"
-
     async def _send_lockdown_message(self, channel: discord.TextChannel, is_locked: bool, reason: str, duration_seconds: int = None):
         """Envia uma mensagem informativa sobre o estado de lockdown."""
         embed = discord.Embed()
