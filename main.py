@@ -15,22 +15,41 @@ logger = logging.getLogger(__name__)
 from database import init_db
 
 # --- Configuration Loading ---
+DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+PREFIX = os.getenv('BOT_PREFIX', '!')
+OWNER_IDS_STR = os.getenv('BOT_OWNER_IDS', '')
+
+# Fallback to config.json if environment variables are not set
+# For security, the token should ideally only come from environment variables in production.
+config = {}
 try:
     with open('config.json', 'r') as f:
         config = json.load(f)
-    DISCORD_BOT_TOKEN = config.get('DISCORD_BOT_TOKEN')
-    PREFIX = config.get('PREFIX', '!')
-    OWNER_IDS = config.get('OWNER_IDS', []) # List of owner IDs for owner commands
+    logger.info("Loaded configuration from config.json.")
 except FileNotFoundError:
-    logger.critical("config.json not found! Please create a config.json with your bot token.")
-    DISCORD_BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
-    PREFIX = os.getenv('BOT_PREFIX', '!')
-    OWNER_IDS = [int(x) for x in os.getenv('BOT_OWNER_IDS', '').split(',') if x]
-    if not DISCORD_BOT_TOKEN:
-        raise ValueError("DISCORD_BOT_TOKEN not found in config.json or environment variables.")
+    logger.warning("config.json not found. Relying on environment variables and defaults.")
 except json.JSONDecodeError:
-    logger.critical("Error decoding config.json. Please check its format.")
-    raise
+    logger.critical("Error decoding config.json. Please check its format. Relying on environment variables and defaults.")
+
+# Use environment variables primarily, fallback to config.json if necessary and available.
+if not DISCORD_BOT_TOKEN:
+    DISCORD_BOT_TOKEN = config.get('DISCORD_BOT_TOKEN') # This should be None after previous steps, but good practice.
+if PREFIX == '!': # Only override default if env var was not set
+     PREFIX = config.get('PREFIX', '!')
+if not OWNER_IDS_STR:
+     OWNER_IDS = config.get('OWNER_IDS', [])
+else:
+    # Convert owner IDs string from environment variable to list of ints
+    OWNER_IDS = [int(x) for x in OWNER_IDS_STR.split(',') if x]
+
+# Final check for the token
+if not DISCORD_BOT_TOKEN:
+    raise ValueError("DISCORD_BOT_TOKEN not found in environment variables or config.json.")
+
+logger.info("Configuration loaded.")
+logger.info(f"Prefix: {PREFIX}")
+logger.info(f"Owner IDs: {OWNER_IDS}")
+# Avoid logging the actual token!
 
 # --- Bot Setup ---
 class MyBot(commands.Bot):
