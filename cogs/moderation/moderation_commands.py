@@ -181,7 +181,7 @@ class KickModal(ui.Modal, title="Expulsar Usuário"):
             try:
                 success = await self.db.execute_query( # Usando self.db
                     adapt_query_placeholders("INSERT INTO moderation_logs (guild_id, action, target_id, moderator_id, reason) VALUES (?, ?, ?, ?, ?)"),
-                    (interaction.guild.id, "kick", self.target_member.id, interaction.user.id, reason_text)
+                    (interaction.guild.id, "kick", self.target_member.id, interaction.user.id, reason_text))
             except Exception as e:
                 logger.error(f"Erro ao registrar expulsão no DB para {self.target_member.id}: {e}", exc_info=True)
                 # Não precisa retornar aqui, pois a expulsão já foi feita. Apenas logar.

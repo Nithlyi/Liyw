@@ -588,6 +588,7 @@ class EmbedCreatorCog(commands.Cog):
             result = await self.db.fetch_one( # Usando self.db
                 adapt_query_placeholders("SELECT embed_json FROM saved_embeds WHERE guild_id = ? AND embed_name = ?"),
                 (guild_id, name)
+            )
         except Exception as e:
             logging.error(f"Erro ao carregar embed do DB para guild {guild_id}, nome {name}: {e}", exc_info=True)
             await interaction.response.send_message("Ocorreu um erro ao carregar o embed.", ephemeral=True)

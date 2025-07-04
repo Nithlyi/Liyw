@@ -413,6 +413,7 @@ class AntiFeaturesControlView(ui.View):
             panel_settings = await self.bot.db_connection.fetch_one(
                 adapt_query_placeholders("SELECT panel_channel_id, panel_message_id FROM anti_features_settings WHERE guild_id = ?"),
                 (interaction.guild_id,)
+            )
             if panel_settings and panel_settings['panel_channel_id'] and panel_settings['panel_message_id']:
                 channel = self.bot.get_channel(panel_settings['panel_channel_id'])
                 if channel:

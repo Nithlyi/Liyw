@@ -80,9 +80,9 @@ class LockdownCore(commands.Cog):
 
             db_success = False
             try:
-            db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None))  # Usando self.db
-        except Exception as e:
-            logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
+                db_success = await self.db.execute_query(adapt_query_placeholders(db_query), (channel.id, channel.guild.id, locked_until, reason, locked_by.id if locked_by else None))  # Usando self.db
+            except Exception as e:
+                logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}): {e}", exc_info=True)
 
         if not db_success:
                 logging.error(f"Falha ao registrar lockdown no DB para canal #{channel.name} ({channel.id}).")

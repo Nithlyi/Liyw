@@ -335,7 +335,7 @@ class LockdownPanel(commands.Cog):
         
         panel_datas = []
         try:
-        panel_datas = await self.db.fetch_all(adapt_query_placeholders("SELECT guild_id, channel_id, message_id FROM lockdown_panel_settings")) # Usando self.db
+            panel_datas = await self.db.fetch_all(adapt_query_placeholders("SELECT guild_id, channel_id, message_id FROM lockdown_panel_settings")) # Usando self.db
         except Exception as e:
             logging.error(f"Erro ao buscar painéis persistentes de lockdown do DB: {e}", exc_info=True)
             return # Aborta se houver erro no DB
