@@ -684,7 +684,7 @@ class TicketPanelView(ui.View):
 
         # Corrigido: Usar $1 e $2 para os parâmetros guild_id e user_id na consulta
         existing_ticket = await self.bot.db_connection.fetch_one(
-            adapt_query_placeholders("SELECT channel_id FROM active_tickets WHERE guild_id = ? AND user_id = ? AND status = 'open'"),
+            adapt_query_placeholders("SELECT channel_id FROM active_tickets WHERE guild_id = $1 AND user_id = $2 AND status = 'open'"),
             (interaction.guild_id, interaction.user.id)
         )
         if existing_ticket:
@@ -692,11 +692,11 @@ class TicketPanelView(ui.View):
             await interaction.followup.send(f"Você já tem um ticket aberto em {channel.mention}.", ephemeral=True)
             return
         else:
-            await self.bot.db_connection.execute_query(adapt_query_placeholders("DELETE FROM active_tickets WHERE channel_id = ?"), (existing_ticket['channel_id'],))
+            await self.bot.db_connection.execute_query(adapt_query_placeholders("DELETE FROM active_tickets WHERE channel_id = $1"), (existing_ticket['channel_id'],))
             logging.warning(f"Registro de ticket obsoleto para o usuário {interaction.user.id} na guild {interaction.guild_id} removido.")
 
         settings = await self.bot.db_connection.fetch_one(
-            adapt_query_placeholders("SELECT category_id, support_role_id, ticket_initial_embed_json FROM ticket_settings WHERE guild_id = ?"),
+            adapt_query_placeholders("SELECT category_id, support_role_id, ticket_initial_embed_json FROM ticket_settings WHERE guild_id = $1"),
             (interaction.guild_id,)
         )
 
